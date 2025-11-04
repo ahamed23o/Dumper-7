@@ -71,12 +71,13 @@ void FName::Init_Windows(bool bForceGNames)
 #ifdef PLATFORM_WINDOWS
 
 #if defined(_WIN64)
-	constexpr std::array<const char*, 6> PossibleSigs = 
+	constexpr std::array<const char*, 7> PossibleSigs = 
 	{ 
 		"48 8D ? ? 48 8D ? ? E8",
 		"48 8D ? ? ? 48 8D ? ? E8",
 		"48 8D ? ? 49 8B ? E8",
 		"48 8D ? ? ? 49 8B ? E8",
+		"48 8D ? ? ? 49 8B ? FF 15",
 		"48 8D ? ? 48 8B ? E8",
 		"48 8D ? ? ? 48 8B ? E8",
 	};
@@ -105,6 +106,11 @@ void FName::Init_Windows(bool bForceGNames)
 
 		// This signature partially overlaps with the signature for an inlined FName::AppendString call (see comment below)
 		bFoundPotentiallyOverlappingSig = MatchingSig && strcmp(MatchingSig, "48 8D ? ? ? 48 8B ? E8") == 0;
+
+		if (MatchingSig && strcmp(MatchingSig, "48 8D ? ? ? 49 8B ? FF 15") == 0) {
+			AppendString = static_cast<decltype(AppendString)>(*(void**)AppendString);
+
+		}
 	}
 
 	// Test if AppendString was inlined
