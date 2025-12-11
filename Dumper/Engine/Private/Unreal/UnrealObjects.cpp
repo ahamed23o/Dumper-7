@@ -615,15 +615,65 @@ bool UEStruct::HasType(UEStruct Type) const
 }
 
 std::vector<UEProperty> UEStruct::GetProperties() const
-{
+{	
+	static std::vector< EClassCastFlags> UnreferencingCastFlags = { 
+		EClassCastFlags::Int8Property,
+		EClassCastFlags::ByteProperty,
+		EClassCastFlags::IntProperty,
+		EClassCastFlags::FloatProperty,
+		EClassCastFlags::UInt64Property,
+		EClassCastFlags::ClassProperty,
+		EClassCastFlags::UInt32Property,
+		EClassCastFlags::InterfaceProperty,
+		EClassCastFlags::NameProperty,
+		EClassCastFlags::StrProperty,
+		EClassCastFlags::Property,
+		EClassCastFlags::ObjectProperty,
+		EClassCastFlags::BoolProperty,
+		EClassCastFlags::UInt16Property,
+		EClassCastFlags::StructProperty,
+		EClassCastFlags::ArrayProperty,
+		EClassCastFlags::Int64Property,
+		EClassCastFlags::DelegateProperty,
+		EClassCastFlags::NumericProperty,
+		EClassCastFlags::MulticastDelegateProperty,
+		EClassCastFlags::ObjectPropertyBase,
+		EClassCastFlags::WeakObjectProperty,
+		EClassCastFlags::LazyObjectProperty,
+		EClassCastFlags::SoftObjectProperty,
+		EClassCastFlags::TextProperty,
+		EClassCastFlags::Int16Property,
+		EClassCastFlags::DoubleProperty,
+		EClassCastFlags::SoftClassProperty,
+		EClassCastFlags::MapProperty,
+		EClassCastFlags::SetProperty,
+		EClassCastFlags::EnumProperty,
+		EClassCastFlags::MulticastInlineDelegateProperty,
+		EClassCastFlags::MulticastSparseDelegateProperty,
+		EClassCastFlags::FieldPathProperty,
+		EClassCastFlags::LargeWorldCoordinatesRealProperty,
+		EClassCastFlags::OptionalProperty,
+		EClassCastFlags::VValueProperty,
+		EClassCastFlags::VRestValueProperty,
+		EClassCastFlags::Utf8StrProperty,
+		EClassCastFlags::AnsiStrProperty,
+		EClassCastFlags::VCellProperty
+	};
+
 	std::vector<UEProperty> Properties;
 
 	if (Settings::Internal::bUseFProperty)
 	{
 		for (UEFField Field = GetChildProperties(); Field; Field = Field.GetNext())
 		{
-			if (Field.IsA(EClassCastFlags::Property))
-				Properties.push_back(Field.Cast<UEProperty>());
+			for (int i = 0; i < UnreferencingCastFlags.size(); i++) {
+				if (Field.GetClass().GetCastFlags() & UnreferencingCastFlags[i]) {
+
+					Properties.push_back(Field.Cast<UEProperty>());
+					break;
+				}
+			}
+
 		}
 
 		return Properties;
