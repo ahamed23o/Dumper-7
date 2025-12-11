@@ -181,7 +181,7 @@ void FName::Init_Windows(bool bForceGNames)
 		else /* Attempt to find FName::ToString as a final fallback */
 		{
 			/* Initialize GNames offset without committing to use GNames during the dumping process or in the SDK */
-			NameArray::SetGNamesWithoutCommiting();
+			NameArray::SetGNamesWithoutCommitting();
 			FName::InitFallback();
 		}
 	}
@@ -189,7 +189,7 @@ void FName::Init_Windows(bool bForceGNames)
 	std::cerr << std::format("Found FName::{} at Offset 0x{:X}\n\n", (Off::InSDK::Name::bIsUsingAppendStringOverToString ? "AppendString" : "ToString"), Off::InSDK::Name::AppendNameToString);
 
 	/* Initialize GNames offset without committing to use GNames during the dumping process or in the SDK */
-	NameArray::SetGNamesWithoutCommiting();
+	NameArray::SetGNamesWithoutCommitting();
 
 	if (ToStr)
 		return;
