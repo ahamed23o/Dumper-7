@@ -61,17 +61,17 @@ const StringEntry& HashStringTable::GetStringEntry(int32 BucketIndex, int32 InBu
 
 void HashStringTable::ResizeBucket(StringBucket& Bucket)
 {
-    auto BucketIdx = &Bucket - Buckets;
+    int32 BucketIdx = &Bucket - Buckets;
 
-    const auto OldBucketSize = Bucket.Size;
-    const auto NewBucketSizeMax = static_cast<uint64>(Bucket.SizeMax * 1.5);
+    const uint32 OldBucketSize = Bucket.Size;
+    const uint64 NewBucketSizeMax = Bucket.SizeMax * 1.5;
 
     uint8_t* NewData = static_cast<uint8_t*>(realloc(Bucket.Data, NewBucketSizeMax));
 
     assert(NewData != nullptr && "Realloc failed in function 'ResizeBucket()'.");
 
     Bucket.Data = NewData;
-    Bucket.SizeMax = static_cast<int32>(NewBucketSizeMax);
+    Bucket.SizeMax = NewBucketSizeMax;
 }
 
 template<typename CharType>
@@ -198,12 +198,12 @@ inline std::pair<HashStringTableIndex, bool> HashStringTable::FindOrAdd(const Ch
 /* returns pair<Index, bWasAdded> */
 std::pair<HashStringTableIndex, bool> HashStringTable::FindOrAdd(const std::string& String, bool bShouldMarkAsDuplicated)
 {
-    return FindOrAdd(String.c_str(), static_cast<int32_t>(String.size()), bShouldMarkAsDuplicated);
+    return FindOrAdd(String.c_str(), String.size(), bShouldMarkAsDuplicated);
 }
 
 int32 HashStringTable::GetTotalUsedSize() const
 {
-    auto TotalMemoryUsed = 0x0;
+    uint64 TotalMemoryUsed = 0x0;
 
     for (int i = 0; i < NumBuckets; i++)
     {
@@ -217,8 +217,8 @@ int32 HashStringTable::GetTotalUsedSize() const
 
 void HashStringTable::DebugPrintStats() const
 {
-    auto TotalMemoryUsed = 0x0;
-    auto TotalMemoryAllocated = 0x0;
+    uint64 TotalMemoryUsed = 0x0;
+    uint64 TotalMemoryAllocated = 0x0;
 
     for (int i = 0; i < NumBuckets; i++)
     {

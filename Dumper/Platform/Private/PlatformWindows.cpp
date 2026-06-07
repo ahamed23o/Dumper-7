@@ -20,8 +20,7 @@ namespace
 			return Imagebase != NULL && SectionHeader != nullptr;
 		}
 	};
-	static_assert(sizeof(WindowsSectionInfo) == sizeof(SectionInfo), "To allow interchangeable casting between SectionInfo types the sizes must match.");
-	static_assert(std::is_trivially_copyable_v<WindowsSectionInfo> && std::is_trivially_copyable_v<SectionInfo>, "bit_cast between SectionInfo types requires both to be trivially copyable.");
+	static_assert(sizeof(WindowsSectionInfo) == sizeof(SectionInfo), "To allow interchangable clasting between SectionInfo types you must ensure that the size matches.");
 
 	inline WindowsSectionInfo SectionInfoToWinSectionInfo(const SectionInfo& Info)
 	{
@@ -129,16 +128,16 @@ namespace
 		const PEB* Peb = GetPEB();
 		const PEB_LDR_DATA* Ldr = Peb->Ldr;
 
+		int NumEntriesLeft = Ldr->Length;
+
 		const std::string LowercaseSearchModuleName = Utils::StrToLower(SearchModuleName);
 
-		const LIST_ENTRY* FirstEntry = &Ldr->InMemoryOrderModuleList;
-		for (const LIST_ENTRY* P = Ldr->InMemoryOrderModuleList.Flink; P && P != FirstEntry; P = P->Flink)
+		for (const LIST_ENTRY* P = Ldr->InMemoryOrderModuleList.Flink; P && NumEntriesLeft-- > 0; P = P->Flink)
 		{
 			const LDR_DATA_TABLE_ENTRY* Entry = reinterpret_cast<const LDR_DATA_TABLE_ENTRY*>(P);
 
 			const std::wstring WideModuleName(Entry->BaseDllName.Buffer, Entry->BaseDllName.Length >> 1);
-			std::string ModuleName(WideModuleName.size(), '\0');
-			std::transform(WideModuleName.begin(), WideModuleName.end(), ModuleName.begin(), [](wchar_t c) { return static_cast<char>(c); });
+			const std::string ModuleName = std::string(WideModuleName.begin(), WideModuleName.end());
 
 			if (Utils::StrToLower(ModuleName) == LowercaseSearchModuleName)
 				return Entry;
@@ -229,7 +228,7 @@ namespace
 		const std::string LowercaseSearchModuleName = Utils::StrToLower(ModuleToImportFrom);
 
 		/* Loop all modules and if we found the right one, loop all imports to get the one we need */
-		for (PIMAGE_IMPORT_DESCRIPTOR Import = ImportTable; Import && Import->Characteristics != 0x0; Import++)
+		for (const IMAGE_IMPORT_DESCRIPTOR* Import = ImportTable; Import && Import->Characteristics != 0x0; Import++)
 		{
 			if (Import->Name == 0xFFFF)
 				continue;
@@ -278,7 +277,7 @@ namespace
 		return nullptr;
 	}
 
-	std::pair<uintptr_t, ptrdiff_t> GetSearchStartAndRangeBasedOnOverrides(const uintptr_t ModuleBase, const IMAGE_SECTION_HEADER* SectionHeader, const uintptr_t StartAddress, int32_t Range)
+	std::pair<uintptr_t, uint32_t> GetSearchStartAndRangeBasedOnOverrides(const uintptr_t ModuleBase, const IMAGE_SECTION_HEADER* SectionHeader, const uintptr_t StartAddress, int32_t Range)
 	{
 		if (SectionHeader->VirtualAddress == NULL || SectionHeader->Misc.VirtualSize == 0x0)
 			return { NULL, 0x0 };
@@ -286,7 +285,7 @@ namespace
 		const uintptr_t SectionStartAddress = ModuleBase + SectionHeader->VirtualAddress;
 		const uintptr_t SectionEndAddress = SectionStartAddress + SectionHeader->Misc.VirtualSize;
 
-		ptrdiff_t SearchRange = (Range > 0x0 && Range < static_cast<int32_t>(SectionHeader->Misc.VirtualSize)) ? Range : static_cast<ptrdiff_t>(SectionHeader->Misc.VirtualSize);
+		uint32_t SearchRange = (Range > 0x0 && Range < SectionHeader->Misc.VirtualSize) ? Range : SectionHeader->Misc.VirtualSize;
 		uintptr_t SearchStartAddress = SectionStartAddress;
 
 		// Check if this section contains the StartAddress
@@ -297,7 +296,7 @@ namespace
 				return { NULL, 0x0 };
 
 			SearchStartAddress = StartAddress;
-			SearchRange = static_cast<ptrdiff_t>(SectionEndAddress - StartAddress);
+			SearchRange = SectionEndAddress - StartAddress;
 		}
 
 		return { SearchStartAddress, SearchRange };
@@ -334,12 +333,7 @@ namespace
 
 void* WindowsPrivateImplHelper::FinAlignedValueInRangeImpl(const void* ValuePtr, ValueCompareFuncType ComparisonFunction, const int32_t ValueTypeSize, const int32_t Alignment, uintptr_t StartAddress, uint32_t Range)
 {
-	const auto SizeFromEnd = GetAlignedSizeWithOffsetFromEnd(Range, Alignment, ValueTypeSize);
-
-	if (SizeFromEnd == -1)
-		return nullptr;
-
-	for (int64_t i = 0x0; i <= SizeFromEnd; i += Alignment)
+	for (int64_t i = 0x0; i <= GetAlignedSizeWithOffsetFromEnd(Range, Alignment, ValueTypeSize); i += Alignment)
 	{
 		void* TypedPtr = reinterpret_cast<void*>(StartAddress + i);
 
@@ -373,9 +367,9 @@ void* WindowsPrivateImplHelper::FindAlignedValueInAllSectionsImpl(const void* Va
 			return false;
 
 		if (Range > 0x0)
-			Range -= static_cast<int32_t>(SearchRange);
+			Range -= SearchRange;
 
-		Result = FinAlignedValueInRangeImpl(ValuePtr, ComparisonFunction, ValueTypeSize, Alignment, SearchStartAddress, static_cast<uint32_t>(SearchRange));
+		Result = FinAlignedValueInRangeImpl(ValuePtr, ComparisonFunction, ValueTypeSize, Alignment, SearchStartAddress, SearchRange);
 
 		return Result != nullptr;
 	};
@@ -392,11 +386,7 @@ uintptr_t PlatformWindows::GetModuleBase(const char* const ModuleName)
 	if (ModuleName == nullptr)
 		return reinterpret_cast<uintptr_t>(GetPEB()->ImageBaseAddress);
 
-	const LDR_DATA_TABLE_ENTRY* Entry = GetModuleLdrTableEntry(ModuleName); //This can return nullptr.
-	if (!Entry)
-		return 0x0;
-
-	return reinterpret_cast<uintptr_t>(Entry->DllBase);
+	return reinterpret_cast<uintptr_t>(GetModuleLdrTableEntry(ModuleName)->DllBase);
 }
 
 uintptr_t PlatformWindows::GetOffset(const uintptr_t Address, const char* const ModuleName)
@@ -431,10 +421,7 @@ void* PlatformWindows::IterateSectionWithCallback(const SectionInfo& Info, const
 		return nullptr;
 
 	const uintptr_t SectionBaseAddrss = WinSectionInfo.Imagebase + WinSectionInfo.SectionHeader->VirtualAddress;
-	const auto SectionIterationSize = GetAlignedSizeWithOffsetFromEnd(WinSectionInfo.SectionHeader->Misc.VirtualSize, Granularity, OffsetFromEnd);
-
-	if (SectionIterationSize == -1)
-		return nullptr;
+	const uint32_t SectionIterationSize = GetAlignedSizeWithOffsetFromEnd(WinSectionInfo.SectionHeader->Misc.VirtualSize, Granularity, OffsetFromEnd);
 
 	for (uintptr_t CurrentAddress = SectionBaseAddrss; CurrentAddress < (SectionBaseAddrss + SectionIterationSize); CurrentAddress += Granularity)
 	{
@@ -478,8 +465,9 @@ bool PlatformWindows::IsAddressInAnyModule(const void* Address)
 	const PEB* Peb = GetPEB();
 	const PEB_LDR_DATA* Ldr = Peb->Ldr;
 
-	const LIST_ENTRY* FirstEntry = &Ldr->InMemoryOrderModuleList;
-	for (const LIST_ENTRY* P = Ldr->InMemoryOrderModuleList.Flink; P && P != FirstEntry; P = P->Flink)
+	int NumEntriesLeft = Ldr->Length;
+
+	for (const LIST_ENTRY* P = Ldr->InMemoryOrderModuleList.Flink; P && NumEntriesLeft-- > 0; P = P->Flink)
 	{
 		const LDR_DATA_TABLE_ENTRY* Entry = reinterpret_cast<const LDR_DATA_TABLE_ENTRY*>(P);
 
@@ -539,8 +527,9 @@ const void* PlatformWindows::GetAddressOfImportedFunctionFromAnyModule(const cha
 	const PEB* Peb = GetPEB();
 	const PEB_LDR_DATA* Ldr = Peb->Ldr;
 
-	const LIST_ENTRY* FirstEntry = &Ldr->InMemoryOrderModuleList;
-	for (const LIST_ENTRY* P = Ldr->InMemoryOrderModuleList.Flink; P && P != FirstEntry; P = P->Flink)
+	int NumEntriesLeft = Ldr->Length;
+
+	for (const LIST_ENTRY* P = Ldr->InMemoryOrderModuleList.Flink; P && NumEntriesLeft-- > 0; P = P->Flink)
 	{
 		const LDR_DATA_TABLE_ENTRY* Entry = reinterpret_cast<const LDR_DATA_TABLE_ENTRY*>(P);
 
@@ -576,13 +565,13 @@ const void* PlatformWindows::GetAddressOfExportedFunction(const char* SearchModu
 	const WORD* Ordinals = reinterpret_cast<const WORD*>(ModuleBase + ExportTable->AddressOfNameOrdinals);
 
 	/* Iterate all names and return the function if the name matches what we're looking for */
-	for (DWORD i = 0; i < ExportTable->NumberOfNames; i++)
+	for (int i = 0; i < ExportTable->NumberOfFunctions; i++)
 	{
 		const WORD NameIndex = Ordinals[i];
-		const char* Name = reinterpret_cast<const char*>(ModuleBase + NameOffsets[i]);
+		const char* Name = reinterpret_cast<const char*>(ModuleBase + NameOffsets[NameIndex]);
 
 		if (strcmp(SearchFunctionName, Name) == 0)
-			return reinterpret_cast<void*>(ModuleBase + FunctionOffsets[NameIndex]);
+			return reinterpret_cast<void*>(ModuleBase + FunctionOffsets[i]);
 	}
 
 	return nullptr;
@@ -612,7 +601,7 @@ std::pair<const void*, int32_t> PlatformWindows::IterateVTableFunctions(void** V
 	if (!CallBackForEachFunc)
 		return { nullptr, -1 };
 
-	for (int i = OffsetFromStart; i < (OffsetFromStart + NumFunctions); i++)
+	for (int i = 0; i < 0x150; i++)
 	{
 		const uintptr_t CurrentFuncAddress = reinterpret_cast<uintptr_t>(VTable[i]);
 
@@ -641,7 +630,7 @@ void* PlatformWindows::FindPattern(const char* Signature, const uint32_t Offset,
 		if (SearchStartAddress == NULL || SearchRange == 0x0)
 			return false;
 
-		Result = FindPatternInRange(Signature, reinterpret_cast<const uint8_t*>(SearchStartAddress), static_cast<uintptr_t>(SearchRange), Offset != 0x0, Offset);
+		Result = FindPatternInRange(Signature, reinterpret_cast<const uint8_t*>(SearchStartAddress), SearchRange, Offset != 0x0, Offset);
 
 		return Result != nullptr;
 	};
@@ -705,11 +694,10 @@ void* PlatformWindows::FindPatternInRange(std::vector<int>&& Signature, const vo
 	const auto PatternLength = static_cast<int64_t>(Signature.size());
 	const auto PatternBytes = Signature.data();
 
-	int CurrentSkips = 0;
-
 	for (int i = 0; i < (static_cast<int64_t>(Range) - PatternLength); i++)
 	{
 		bool bFound = true;
+		int CurrentSkips = 0;
 
 		for (auto j = 0ul; j < PatternLength; ++j)
 		{
@@ -731,7 +719,7 @@ void* PlatformWindows::FindPatternInRange(std::vector<int>&& Signature, const vo
 			if (bRelative)
 			{
 				if (Offset == -1)
-					Offset = static_cast<uint32_t>(PatternLength);
+					Offset = PatternLength;
 
 				Address = ((Address + Offset + 4) + *reinterpret_cast<int32_t*>(Address + Offset));
 			}
@@ -762,12 +750,12 @@ void* PlatformWindows::FindByStringInAllSections(const CharType* RefStr,const ui
 			return false;
 
 		if (Range > 0x0)
-			Range -= static_cast<int32_t>(SearchRange);
+			Range -= SearchRange;
 
 		// Make sure we don't try to read beyond the limit. This might cause string refs at the very end of a search Range not to be found.
 		constexpr auto InstructionBytesLength = 0x7;
 
-		Result = FindStringInRange<bCheckIfLeaIsStrPtr, CharType>(RefStr, SearchStartAddress, static_cast<int32_t>(SearchRange - InstructionBytesLength));
+		Result = FindStringInRange<bCheckIfLeaIsStrPtr, CharType>(RefStr, SearchStartAddress, (SearchRange - InstructionBytesLength));
 
 		return Result != nullptr;
 	};
@@ -785,7 +773,7 @@ inline void* PlatformWindows::FindStringInRange(const CharType* RefStr, const ui
 	// Ensure the null-terminator is also compared, else strings that are substrings of other strings might be falsely matched.
 	const int32_t RefStrLen = StrlenHelper(RefStr) + 1;
 
-	for (int32_t i = 0; i < Range; i++)
+	for (int32 i = 0; i < Range; i++)
 	{
 #if defined(_WIN64)
 		// opcode: lea
@@ -823,7 +811,7 @@ inline void* PlatformWindows::FindStringInRange(const CharType* RefStr, const ui
 			if (!IsAddressInProcessRange(StrPtr))
 				continue;
 
-			if (IsBadReadPtr(StrPtr))
+			if (!IsBadReadPtr(StrPtr))
 				continue;
 
 			if (StrnCmpHelper(RefStr, reinterpret_cast<const CharType*>(StrPtr), RefStrLen))

@@ -90,11 +90,6 @@ void MemberManager::InitReservedNames()
 	MemberNames.AddReservedClassName("Params", true);
 	MemberNames.AddReservedClassName("Flgs", true);
 
-	/* Auto-generated function names */
-	MemberNames.AddReservedClassName("StaticClass", false);
-	MemberNames.AddReservedClassName("StaticName", false);
-	MemberNames.AddReservedClassName("GetDefaultObj", false);
-
 
 	/* Reserved C++ keywords, typedefs and macros */
 	MemberNames.AddReservedName("byte");

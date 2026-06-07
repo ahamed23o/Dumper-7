@@ -24,8 +24,6 @@ file(GLOB_RECURSE CPP_SOURCES
 
 add_library(${PROJECT_NAME} SHARED ${CPP_SOURCES})
 
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
-
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
 # Dumper
@@ -54,13 +52,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/Dumper/Generator/Public/Generators
     ${CMAKE_SOURCE_DIR}/Dumper/Generator/Public/Managers
     ${CMAKE_SOURCE_DIR}/Dumper/Generator/Public/Wrappers
-
-    # Platform
-    ${CMAKE_SOURCE_DIR}/Dumper/Platform
-    ${CMAKE_SOURCE_DIR}/Dumper/Platform/Private
-
-    # Platform Public
-    ${CMAKE_SOURCE_DIR}/Dumper/Platform/Public
 
     # Utils
     ${CMAKE_SOURCE_DIR}/Dumper/Utils

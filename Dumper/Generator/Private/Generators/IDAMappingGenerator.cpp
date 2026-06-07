@@ -1,13 +1,7 @@
 
 #include <fstream>
-#include <unordered_map>
 
 #include "Generators/IDAMappingGenerator.h"
-
-namespace
-{
-	std::unordered_map<uint32, std::string> GIdaFuncs;
-}
 
 
 std::string IDAMappingGenerator::MangleFunctionName(const std::string& ClassName, const std::string& FunctionName)
@@ -64,6 +58,8 @@ void IDAMappingGenerator::GenerateVTableName(StreamType& IdmapFile, UEObject Def
 
 void IDAMappingGenerator::GenerateClassFunctions(StreamType& IdmapFile, UEClass Class)
 {
+	static std::unordered_map<uint32, std::string> Funcs;
+
 	for (const UEFunction Func : Class.GetFunctions())
 	{
 		if (!Func.HasFlags(EFunctionFlags::Native))
@@ -74,7 +70,7 @@ void IDAMappingGenerator::GenerateClassFunctions(StreamType& IdmapFile, UEClass 
 		const uint32 Offset = static_cast<uint32>(Platform::GetOffset(Func.GetExecFunction()));
 		const uint16 NameLen = static_cast<uint16>(MangledName.length());
 
-		auto [It, bInseted] = GIdaFuncs.emplace(Offset, Func.GetFullName());
+		auto [It, bInseted] = Funcs.emplace(Offset, Func.GetFullName());
 
 		if (!bInseted)
 		{
@@ -90,8 +86,6 @@ void IDAMappingGenerator::GenerateClassFunctions(StreamType& IdmapFile, UEClass 
 
 void IDAMappingGenerator::Generate()
 {
-	GIdaFuncs.clear();
-
 	std::string IdaMappingFileName = (Settings::Generator::GameVersion + '-' + Settings::Generator::GameName + ".idmap");
 
 	FileNameHelper::MakeValidFileName(IdaMappingFileName);

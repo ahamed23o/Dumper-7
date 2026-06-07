@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Arch_x86.h"
 #include "Platform.h"
 

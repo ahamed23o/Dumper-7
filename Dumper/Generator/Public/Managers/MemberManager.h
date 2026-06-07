@@ -239,7 +239,7 @@ public:
 		/* Initialize member-name collisions  */
 		for (auto Obj : ObjectArray())
 		{
-			if (!Obj.IsA(EClassCastFlags::Struct))
+			if (!Obj.IsA(EClassCastFlags::Struct) || Obj.IsA(EClassCastFlags::Function))
 				continue;
 
 			AddStructToNameContainer(Obj.Cast<UEStruct>());

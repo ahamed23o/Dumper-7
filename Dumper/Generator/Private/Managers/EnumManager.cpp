@@ -60,11 +60,6 @@ uint8 EnumInfoHandle::GetUnderlyingTypeSize() const
 	return Info->UnderlyingTypeSize;
 }
 
-bool EnumInfoHandle::IsUnderlayingTypeSigned() const
-{
-	return Info->bIsSigned;
-}
-
 const StringEntry& EnumInfoHandle::GetName() const
 {
 	return EnumManager::GetEnumName(*Info);
@@ -87,7 +82,7 @@ void EnumManager::InitInternal()
 		if (Obj.HasAnyFlags(EObjectFlags::ClassDefaultObject))
 			continue;
 
-		if (!Settings::Internal::bHasUnderlayingTypeInUEnum && Obj.IsA(EClassCastFlags::Struct))
+		if (Obj.IsA(EClassCastFlags::Struct))
 		{
 			UEStruct ObjAsStruct = Obj.Cast<UEStruct>();
 
@@ -124,15 +119,13 @@ void EnumManager::InitInternal()
 				/* Check if the size of this enums underlaying type is greater than the default size (0x1) */
 				if (Enum)
 				{
-					const int32 PropertySize = Property.GetSize();
-					Info.UnderlyingTypeSize = max(Info.UnderlyingTypeSize, PropertySize);
+					Info.UnderlyingTypeSize = Property.GetSize();
 					continue;
 				}
 
 				if (UnderlayingProperty)
 				{
-					const int32 PropertySize = UnderlayingProperty.GetSize();
-					Info.UnderlyingTypeSize = max(Info.UnderlyingTypeSize, PropertySize);
+					Info.UnderlyingTypeSize = UnderlayingProperty.GetSize();
 					continue;
 				}
 			}
@@ -196,13 +189,6 @@ void EnumManager::InitInternal()
 				NewOrExistingInfo.MemberInfos.push_back(CurrentEnumValueInfo);
 			}
 
-			if (Settings::Internal::bHasUnderlayingTypeInUEnum)
-			{
-				auto [Size, bIsSigned] = ObjAsEnum.GetSizeSignedPair();
-				NewOrExistingInfo.UnderlyingTypeSize = Size;
-				NewOrExistingInfo.bIsSigned = bIsSigned;
-			}
-
 			/* Initialize the size based on the highest value contained by this enum */
 			if (!NewOrExistingInfo.bWasEnumSizeInitialized && !NewOrExistingInfo.bWasInstanceFound)
 			{
@@ -229,13 +215,6 @@ void EnumManager::InitIllegalNames()
 	IllegalNames.push_back(UniqueEnumValueNames.FindOrAdd("NO_ERROR").first);
 	IllegalNames.push_back(UniqueEnumValueNames.FindOrAdd("EVENT_MAX").first);
 	IllegalNames.push_back(UniqueEnumValueNames.FindOrAdd("IGNORE").first);
-	IllegalNames.push_back(UniqueEnumValueNames.FindOrAdd("small").first);
-
-	IllegalNames.push_back(UniqueEnumValueNames.FindOrAdd("short").first);
-	IllegalNames.push_back(UniqueEnumValueNames.FindOrAdd("long").first);
-	IllegalNames.push_back(UniqueEnumValueNames.FindOrAdd("int").first);
-	IllegalNames.push_back(UniqueEnumValueNames.FindOrAdd("signed").first);
-	IllegalNames.push_back(UniqueEnumValueNames.FindOrAdd("unsigned").first);
 }
 
 void EnumManager::Init()
