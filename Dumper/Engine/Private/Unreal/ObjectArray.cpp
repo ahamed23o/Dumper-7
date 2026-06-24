@@ -28,14 +28,6 @@ constexpr inline std::array FChunkedFixedUObjectArrayLayouts =
 	FChunkedFixedUObjectArrayLayout // Default UE4.21 and above
 	{
 		.ObjectsOffset = 0x00,
-		.MaxElementsOffset = 0x0C,
-		.NumElementsOffset = 0x08,
-		.MaxChunksOffset = 0x14,
-		.NumChunksOffset = 0x10,
-	},
-	FChunkedFixedUObjectArrayLayout // Default UE4.21 and above
-	{
-		.ObjectsOffset = 0x00,
 		.MaxElementsOffset = 0x10,
 		.NumElementsOffset = 0x14,
 		.MaxChunksOffset = 0x18,
