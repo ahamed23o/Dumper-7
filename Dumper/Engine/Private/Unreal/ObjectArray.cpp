@@ -149,6 +149,9 @@ bool IsAddressValidGObjects(const uintptr_t Address, const FChunkedFixedUObjectA
 	if (!bMaxChunksFitsMaxElements)
 		return false;
 
+	if (MaxElements % ElementsPerChunk != 0)
+		return false;
+
 	if (!ObjectsPtrButDecrypted || Platform::IsBadReadPtr(ObjectsPtrButDecrypted))
 		return false;
 
